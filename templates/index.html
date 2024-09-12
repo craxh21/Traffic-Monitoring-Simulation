@@ -1,0 +1,29 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traffic Image Simulation</title>
+</head>
+<body>
+    <h1>Traffic Image Simulation</h1>
+    <form action="/" method="post" enctype="multipart/form-data">
+        <input type="file" name="image">
+        <input type="submit" value="Upload Image">
+    </form>
+    <hr>
+    {% for image_path, vehicle_counts in images_and_counts %}
+        <div>
+            <img src="{{ url_for('static', filename='images/' + image_path) }}" alt="Uploaded Image" width="300">
+            <p>Total Detected Vehicles: {{ vehicle_counts['total'] }}</p>
+            <ul>
+                <li>Cars: {{ vehicle_counts['car'] }}</li>
+                <li>Buses: {{ vehicle_counts['bus'] }}</li>
+                <li>Trucks: {{ vehicle_counts['truck'] }}</li>
+                <li>Motorcycles: {{ vehicle_counts['motorcycle'] }}</li>
+            </ul>
+        </div>
+    {% endfor %}
+</body>
+</html>
