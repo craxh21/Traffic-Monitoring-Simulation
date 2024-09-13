@@ -3,26 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Traffic Image Simulation</title>
+    <title>Video Simulation</title>
 </head>
 <body>
-    <h1>Traffic Image Simulation</h1>
-    <form action="/" method="post" enctype="multipart/form-data">
-        <input type="file" name="image">
-        <input type="submit" value="Upload Image">
+    <h1>Upload and Display Traffic Videos</h1>
+
+    <!-- Video Upload Form -->
+    <form action="/" method="POST" enctype="multipart/form-data">
+        <input type="file" name="video" accept="video/*" required>
+        <button type="submit">Upload Video</button>
     </form>
+
     <hr>
-    {% for image_path, vehicle_counts in images_and_counts %}
-        <div>
-            <img src="{{ url_for('static', filename='images/' + image_path) }}" alt="Uploaded Image" width="300">
-            <p>Total Detected Vehicles: {{ vehicle_counts['total'] }}</p>
-            <ul>
-                <li>Cars: {{ vehicle_counts['car'] }}</li>
-                <li>Buses: {{ vehicle_counts['bus'] }}</li>
-                <li>Trucks: {{ vehicle_counts['truck'] }}</li>
-                <li>Motorcycles: {{ vehicle_counts['motorcycle'] }}</li>
-            </ul>
-        </div>
-    {% endfor %}
+
+    <!-- Display Available Videos -->
+    <h2>Available Videos</h2>
+    {% if videos %}
+        <ul>
+            {% for video in videos %}
+                <li>
+                    <video width="320" height="240" controls>
+                        <source src="{{ url_for('static', filename='videos/' ~ video) }}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                    <p>{{ video }}</p>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No videos available.</p>
+    {% endif %}
 </body>
 </html>

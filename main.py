@@ -1,70 +1,29 @@
-from flask import Flask, request, render_template
+from flask import Flask, render_template, request, redirect, url_for
 import os
-from ultralytics import YOLO
-import cv2
 
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = 'static/images'
 
-# Load the YOLOv8 model
-model = YOLO('models/yolov8n.pt')  # Using the YOLOv8 nano model. Replace with other model if needed.
+# Set the upload folder
+UPLOAD_FOLDER = 'static/videos'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Function to detect vehicles in an image
-def detect_vehicles(image_path):
-    # Load the image
-    image = cv2.imread(image_path)
-
-    # Perform inference with YOLOv8
-    results = model(image)
-
-    # Initialize counters for vehicle types
-    vehicle_counts = {
-        "car": 0,
-        "truck": 0,
-        "motorcycle": 0,
-        "bus": 0,
-        "total": 0
-    }
-
-    # Process the results to count vehicle types
-    for result in results[0].boxes.data:  # Adjust based on YOLOv8 output format
-        class_id = int(result[5])  # Class ID
-        confidence = result[4]  # Confidence score
-
-        # Filter by confidence threshold
-        if confidence > 0.2:  #adjust as your need
-            # Assuming class IDs are mapped according to COCO names
-            if class_id == 2:  # Car
-                vehicle_counts["car"] += 1
-            elif class_id == 5:  # Bus
-                vehicle_counts["bus"] += 1
-            elif class_id == 7:  # Truck
-                vehicle_counts["truck"] += 1
-            elif class_id == 3:  # Motorcycle
-                vehicle_counts["motorcycle"] += 1
-
-            vehicle_counts["total"] += 1
-
-    return vehicle_counts
-
+# Ensure the upload directory exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 @app.route('/', methods=['GET', 'POST'])
-def upload_image():
-    images_and_counts = []
+def index():
     if request.method == 'POST':
-        file = request.files['image']
-        if file:
-            image_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-            file.save(image_path)
+        # Handle video upload
+        if 'video' in request.files:
+            video_file = request.files['video']
+            if video_file.filename != '':
+                video_path = os.path.join(app.config['UPLOAD_FOLDER'], video_file.filename)
+                video_file.save(video_path)
+                return redirect(url_for('index'))
 
-            # Run the detection function
-            vehicle_counts = detect_vehicles(image_path)
-
-            # Append the results
-            images_and_counts.append((file.filename, vehicle_counts))
-
-    return render_template('index.html', images_and_counts=images_and_counts)
-
+    # List all videos in the /static/videos directory
+    videos = os.listdir(app.config['UPLOAD_FOLDER'])
+    return render_template('index.html', videos=videos)
 
 if __name__ == '__main__':
     app.run(debug=True)
