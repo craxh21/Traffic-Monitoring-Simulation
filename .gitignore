@@ -12,6 +12,7 @@ static/images/*
 
 models/*.weights
 models/*.cfg
+models/*.pt
 
 
 # Distribution / packaging
