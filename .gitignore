@@ -6,9 +6,11 @@ __pycache__/
 # C extensions
 *.so
 
+runs/
 venv/
 static/images/*  
 #This line will prevent any large or temporary user-uploaded images from being committed to your Git repository.
+static/videos/* 
 
 models/*.weights
 models/*.cfg
