@@ -1,99 +1,101 @@
-import cv2
+import cv2      # Import OpenCV for computer vision tasks
+import pandas as pd     # Import pandas for data manipulation
 from ultralytics import YOLO
+from tracker import *
 
-# Function to determine if a point is on the line
-def is_point_on_line(point, line_start, line_end):
-    x, y = point
-    lx1, ly1 = line_start
-    lx2, ly2 = line_end
+model = YOLO('models/yolov8s.pt')
 
-    # Check if the point is within the bounding box defined by the line segment
-    return (min(lx1, lx2) <= x <= max(lx1, lx2) and
-            min(ly1, ly2) <= y <= max(ly1, ly2))
+cap = cv2.VideoCapture('static/videos/test1.mp4')# Start capturing video from the specified file
 
-# Function to check if the bounding box crosses the defined line
-def check_line_crossing(bbox, line_start, line_end):
-    # Unpack the bounding box
-    x1, y1, x2, y2 = bbox
+# Read the class names from the COCO dataset
+my_file = open("coco.txt", "r")  # Open the file containing class names
+data = my_file.read()  # Read the content of the file
+class_list = data.split("\n")  # Split the content into a list of class names based on newline characters
 
-    # Get the line segment coordinates
-    lx1, ly1 = line_start
-    lx2, ly2 = line_end
+count = 0
+tracker = Tracker() # Create an instance of the Tracker class to keep track of detected objects
 
-    # Check for intersection
-    line_vector = (lx2 - lx1, ly2 - ly1)
-    box_corners = [(x1, y1), (x2, y2)]
+# Define regions as tuples of (top_left, bottom_right)
+# Format: ((x1, y1), (x2, y2))
+regions = [
+    ((100, 100), (400, 300)),  # # Define Region 1 with top-left and bottom-right coordinates
+    ((450, 100), (800, 300)),  # Region 2
+    ((100, 350), (400, 550)),  # Region 3
+    ((450, 350), (800, 550))   # Region 4
+]
 
-    for corner in box_corners:
-        if is_point_on_line(corner, line_start, line_end):
-            return True
+# Initialize vehicle ID tracking for each region
+region_vehicle_ids = [set() for _ in range(len(regions))]  # Create a list of sets to track unique vehicle IDs in each region
 
-    return False
+def is_inside_region(center, region):
+    """Check if the center of a vehicle is inside the defined region."""
+    (x1, y1), (x2, y2) = region  # Unpack the coordinates of the region
+    return x1 <= center[0] <= x2 and y1 <= center[1] <= y2  # Return True if the center is within the region's bounds
 
-# Load the pre-trained YOLOv8 model
-model = YOLO('models/yolov8n.pt')
+while True:  # Start an infinite loop to process frames
+    ret, frame = cap.read()  # Read a frame from the video capture
+    if not ret:  # If the frame was not read correctly (end of video)
+        break  # Exit the loop
 
-# Path to your video
-video_path = 'static/videos/traffic2.mp4'
+    count += 1  # Increment the frame count
+    if count % 3 != 0:  # Process every third frame to reduce computational load
+        continue  # Skip the current iteration if it's not a frame to process
 
-# Open the video file
-cap = cv2.VideoCapture(video_path)
+    frame = cv2.resize(frame, (1020, 600))  # Resize the frame for consistent processing
 
-if not cap.isOpened():
-    print("Error: Could not open video.")
-    exit()
+    results = model.predict(frame)  # Use the YOLO model to predict objects in the current frame
+    a = results[0].boxes.data  # Extract the bounding box data from the model's results
+    px = pd.DataFrame(a).astype("float")  # Convert the bounding box data to a pandas DataFrame and ensure the data type is float
 
-# Initialize variables
-vehicle_count = 0
-line_start = (400, 600)  # Starting point of the line (x1, y1)
-line_end = (1050, 200)    # Ending point of the line (x2, y2)
-crossed_ids = set()      # To track crossed vehicle IDs
+    bbox_list = []  # Initialize a list to store bounding boxes
+    for index, row in px.iterrows():  # Iterate through each detected bounding box
+        x1 = int(row[0])  # Get the top-left x-coordinate
+        y1 = int(row[1])  # Get the top-left y-coordinate
+        x2 = int(row[2])  # Get the bottom-right x-coordinate
+        y2 = int(row[3])  # Get the bottom-right y-coordinate
+        d = int(row[5])  # Get the class ID (index) for the detected object
+        c = class_list[d]  # Get the class name corresponding to the class ID
+        bbox_list.append([x1, y1, x2, y2])  # Append the bounding box coordinates to the list
 
-while cap.isOpened():
-    ret, frame = cap.read()
-    
-    if not ret:
-        print("End of video.")
-        break
+    bbox_id = tracker.update(bbox_list)  # Update the tracker with the current bounding box list and get the tracked vehicle IDs
 
-    results = model(frame)
-    annotated_frame = results[0].plot()
+    # Reset region vehicle IDs for the current frame
+    region_vehicle_ids = [set() for _ in range(len(regions))]  # Reset for the current frame
+    current_region_counts = [0] * len(regions)  # Initialize current frame counts
 
-    # Draw the counting line
-    cv2.line(annotated_frame, line_start, line_end, (0, 255, 0), 2)
+    # Draw regions and count vehicles
+    for i, region in enumerate(regions):
+        top_left, bottom_right = region# Unpack the coordinates of the current region
+        cv2.rectangle(frame, top_left, bottom_right, (255, 255, 255), 2)  # Draw region rectangle
+        
+        # Count vehicles in this region
+        for bbox in bbox_id:
+            x3, y3, x4, y4, id = bbox# Unpack the bounding box coordinates and vehicle ID
+            
+            # Calculate the center of the bounding box
+            center_x = (x3 + x4) // 2
+            center_y = (y3 + y4) // 2
+            center = (center_x, center_y)
 
-    for detection in results[0].boxes.data.tolist():
-        class_id = int(detection[5])
-        conf = detection[4]
-        x1, y1, x2, y2 = map(int, detection[:4])
+            # Check if the center is inside the region
+            if is_inside_region(center, region):
+                current_region_counts[i] += 1  # Increment current frame count
+                
+        # Display count for each region based on current frame
+        cv2.putText(frame, f'Region {i + 1} Count: {current_region_counts[i]}', 
+                    (top_left[0], top_left[1] - 10), cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 255, 255), 2)
 
-        # Draw bounding boxes
-        cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
-        cv2.putText(annotated_frame, f'{conf:.2f}', (x1, y1 - 10), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+    # Draw bounding boxes for detected vehicles
+    for bbox in bbox_id:
+        x3, y3, x4, y4, id = bbox
+        cv2.rectangle(frame, (x3, y3), (x4, y4), (0, 255, 255), 2)  # Draw bounding box
+        # Optional: Display vehicle ID
+        # cv2.putText(frame, str(id), (x3, y3 - 10), cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 255, 255), 2)
 
-        # Count vehicles passing the line
-        if class_id == 2 and conf > 0.65:  # Adjust class_id and confidence threshold
+   # Display the frame with annotations
+    cv2.imshow("RGB", frame)  # Show the processed frame in a window
+    if cv2.waitKey(1) & 0xFF == 27:  # Check if the 'Esc' key is pressed
+        break  # Exit the loop if 'Esc' is pressed
 
-            # Check if the vehicle's bounding box crosses the line
-            if check_line_crossing((x1, y1, x2, y2), line_start, line_end) and (class_id not in crossed_ids):
-                vehicle_count += 1
-                crossed_ids.add(class_id)  # Add the ID to the set to avoid recounting
-            elif not check_line_crossing((x1, y1, x2, y2), line_start, line_end):
-                crossed_ids.discard(class_id)  # Remove from the set when the vehicle is below the line
-
-    # Display the vehicle count
-    cv2.putText(annotated_frame, f'Vehicle Count: {vehicle_count}', 
-                (int(frame.shape[1] * 0.75), 50), 
-                cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-
-    # Resize and display the frame
-    resized_frame = cv2.resize(annotated_frame, (640, 480))  # Resize to a manageable size
-    cv2.imshow('YOLOv8 Detection', resized_frame)
-
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-# Release video capture and close OpenCV windows
-cap.release()
-cv2.destroyAllWindows()
+cap.release()  # Release the video capture object
+cv2.destroyAllWindows()  # Close all OpenCV windows
