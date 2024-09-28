@@ -3,7 +3,7 @@ import pandas as pd     # Import pandas for data manipulation
 from ultralytics import YOLO
 from tracker import *
 
-model = YOLO('models/yolov8s.pt')
+model = YOLO('models/yolov8s.pt')  #using yolo model for small object
 
 cap = cv2.VideoCapture('static/videos/test1.mp4')# Start capturing video from the specified file
 
@@ -26,6 +26,18 @@ regions = [
 
 # Initialize vehicle ID tracking for each region
 region_vehicle_ids = [set() for _ in range(len(regions))]  # Create a list of sets to track unique vehicle IDs in each region
+
+
+# function to calculate the region having the max vehicles
+def index_of_max_value(my_list):
+    if len(my_list) == 0:  # Check if the list is empty
+        return None  # Return None if the list is empty
+    max_index = 0  # Assume the first element is the maximum
+    for i in range(1, len(my_list)):
+        if my_list[i] > my_list[max_index]:  # Compare with current max value
+            max_index = i  # Update max_index if a larger value is found
+    return max_index
+
 
 def is_inside_region(center, region):
     """Check if the center of a vehicle is inside the defined region."""
@@ -84,6 +96,14 @@ while True:  # Start an infinite loop to process frames
         # Display count for each region based on current frame
         cv2.putText(frame, f'Region {i + 1} Count: {current_region_counts[i]}', 
                     (top_left[0], top_left[1] - 10), cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 255, 255), 2)
+
+    # Get the region with the maximum vehicle count
+    max_region_index = index_of_max_value(current_region_counts)
+
+    # Display the region with the max vehicle count at the top of the video
+    if max_region_index is not None:
+        cv2.putText(frame, f'Max Vehicles in Region {max_region_index + 1}', (50, 50),
+                    cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255), 2)  # Display the region with the max count
 
     # Draw bounding boxes for detected vehicles
     for bbox in bbox_id:
