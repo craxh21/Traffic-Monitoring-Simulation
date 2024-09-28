@@ -3,35 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Simulation</title>
+    <title>Traffic Control System</title>
+    <style>
+        .signal {
+            font-size: 24px;
+            padding: 10px;
+            color: white;
+        }
+        .red { background-color: red; }
+        .green { background-color: green; }
+        .yellow { background-color: yellow; }
+    </style>
 </head>
 <body>
-    <h1>Upload and Display Traffic Videos</h1>
+    <h1>Traffic Control System</h1>
+    <div>
+        <h2>Live Video Feed</h2>
+        <img src="{{ url_for('video_feed') }}" width="1020" height="600" />
+    </div>
+    <div id="signals">
+        <h2>Signal Status</h2>
+        <div class="signal region_1 red">Region 1: Red</div>
+        <div class="signal region_2 red">Region 2: Red</div>
+        <div class="signal region_3 red">Region 3: Red</div>
+        <div class="signal region_4 red">Region 4: Red</div>
+    </div>
 
-    <!-- Video Upload Form -->
-    <form action="/" method="POST" enctype="multipart/form-data">
-        <input type="file" name="video" accept="video/*" required>
-        <button type="submit">Upload Video</button>
-    </form>
-
-    <hr>
-
-    <!-- Display Available Videos -->
-    <h2>Available Videos</h2>
-    {% if videos %}
-        <ul>
-            {% for video in videos %}
-                <li>
-                    <video width="320" height="240" controls>
-                        <source src="{{ url_for('static', filename='videos/' ~ video) }}" type="video/mp4">
-                        Your browser does not support the video tag.
-                    </video>
-                    <p>{{ video }}</p>
-                </li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p>No videos available.</p>
-    {% endif %}
+    <script>
+        setInterval(() => {
+            fetch('/signal_status')
+                .then(response => response.json())
+                .then(data => {
+                    for (let region in data) {
+                        const element = document.querySelector(`.${region}`);
+                        element.className = `signal ${region} ${data[region]}`;
+                        element.textContent = `${region.replace('_', ' ').replace('region ', '')}: ${data[region].charAt(0).toUpperCase() + data[region].slice(1)}`;
+                    }
+                });
+        }, 1000);  // Update every second
+    </script>
 </body>
 </html>
